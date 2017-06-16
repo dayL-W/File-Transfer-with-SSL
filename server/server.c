@@ -33,8 +33,8 @@ void handle(char cmd)
 		case 'U':
 		{
 			//接收文件名
-			read(newfd, &FileNameSize, 4);
-			read(newfd, (void *)filename, FileNameSize);
+			SSL_read(ssl, &FileNameSize, 4);
+			SSL_read(ssl, (void *)filename, FileNameSize);
 			filename[FileNameSize]='\0';
 			//创建文件
 			if((fd = open(filename,O_RDWR|O_CREAT)) == -1)
@@ -43,10 +43,10 @@ void handle(char cmd)
 				_exit(0);	
 			}
 			//接收文件长度
-			read(newfd, &filesize, 4);
+			SSL_read(ssl, &filesize, 4);
 			
 			//接收文件
-			while((count = read(newfd,(void *)buf,1024)) > 0)
+			while((count = SSL_read(ssl,(void *)buf,1024)) > 0)
 			{
 				write(fd,&buf,count);
 				totalrecv += count;
@@ -61,8 +61,8 @@ void handle(char cmd)
 		case 'D':
 		{
 			//接收文件名
-			read(newfd, &FileNameSize, 4);
-			read(newfd, filename, FileNameSize);
+			SSL_read(ssl, &FileNameSize, 4);
+			SSL_read(ssl, filename, FileNameSize);
 			filename[FileNameSize]='\0';
 			//打开文件
 			if((fd = open(filename,O_RDONLY)) == -1)
@@ -73,11 +73,11 @@ void handle(char cmd)
 			//发送文件包括文件长度
 			if((stat(filename,&fstat)) == -1)
 				return;
-			write(newfd,&fstat.st_size,4);
+			SSL_write(ssl,&fstat.st_size,4);
 			
 			while((count = read(fd,(void *)buf,1024)) > 0)
 			{
-				write(newfd,&buf,count);	
+				SSL_write(ssl,&buf,count);	
 			}
 			close(fd);
 		}
@@ -97,10 +97,10 @@ int main()
 	SSL_load_error_strings();
 	ctx = SSL_CTX_new(SSLv23_server_method());
 	//载入数字证书
-	SSL_CTX_use_certificate_file();
+	SSL_CTX_use_certificate_file(ctx,"./cacert.pem",SSL_FILETYPE_PEM);
 	//载入并检查私钥
-	SSL_CTX_use_PrivateKey_file();
-	SSL_CTX_check_private_key();
+	SSL_CTX_use_PrivateKey_file(ctx,"./privkey.pem",SSL_FILETYPE_PEM);
+	SSL_CTX_check_private_key(ctx);
 	//创建socket
 	if((sockfd = socket(AF_INET,SOCK_STREAM,0)) == -1)
 	{
@@ -133,10 +133,13 @@ int main()
 			perror("accept:");	
 			_exit(0);
 		}
+		SSL_new(ctx);//产生新的SSL
+		SSL_set_fd(ssl,newfd);
+		SSL_accept(ssl);
 		//处理事件
 		while(1)
 		{
-			read(newfd,&cmd,1);
+			SSL_read(ssl,&cmd,1);
 			
 			if(cmd == 'Q')
 			{
@@ -147,8 +150,11 @@ int main()
 				handle(cmd);	
 			}
 		}
+		SSL_shutdown(ssl);
+		SSL_free(ssl);
 		close(newfd);
 	}	
 	close(sockfd);
+	SSL_CTX_free(ctx);
 	return 0;
 }
