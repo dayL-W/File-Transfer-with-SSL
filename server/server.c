@@ -133,7 +133,7 @@ int main()
 			perror("accept:");	
 			_exit(0);
 		}
-		SSL_new(ctx);//产生新的SSL
+		ssl = SSL_new(ctx);//产生新的SSL
 		SSL_set_fd(ssl,newfd);
 		SSL_accept(ssl);
 		//处理事件
