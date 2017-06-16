@@ -7,12 +7,17 @@
 #include<fcntl.h>
 #include<unistd.h>
 
+#include <openssl/err.h>
+#include <openssl/ssl.h>
+
 #define port 3333
 
 int sockfd,newfd;
 struct sockaddr_in sockaddr;
 struct sockaddr_in client_addr;
 int sin_size;
+SSL_CTX *ctx;
+SSL *ssl;
 
 void handle(char cmd)
 {
@@ -82,9 +87,21 @@ void handle(char cmd)
 int main()
 {
 	char cmd;
+	
+	
 	//建立连接
 	
-	//参加socket
+	//SSL连接
+	SSL_library_init();
+	OpenSSL_add_all_algorithms();
+	SSL_load_error_strings();
+	ctx = SSL_CTX_new(SSLv23_server_method());
+	//载入数字证书
+	SSL_CTX_use_certificate_file();
+	//载入并检查私钥
+	SSL_CTX_use_PrivateKey_file();
+	SSL_CTX_check_private_key();
+	//创建socket
 	if((sockfd = socket(AF_INET,SOCK_STREAM,0)) == -1)
 	{
 		perror("socket:");
