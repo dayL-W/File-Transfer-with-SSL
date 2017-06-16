@@ -8,11 +8,17 @@
 #include<fcntl.h>
 #include<unistd.h>
 
+#include <openssl/err.h>
+#include <openssl/ssl.h>
+
 #define port 3333
 
 char ipaddr[15];
 int sockfd;
 struct sockaddr_in sockaddr;
+SSL_CTX *ctx;//SSL套接字
+SSL *ssl;
+
 void linkS()
 {
 	//创建socket
@@ -31,6 +37,17 @@ void linkS()
 		perror("connect");
 		_exit(0);
 	}
+	
+	ssl = SSL_new(ctx);
+	SSL_set_fd(ssl,sockfd);
+	if(SSL_connect(ssl) == -1)
+	{
+		printf("SSL connect successful!");	
+	}
+	else
+	{
+		printf("SSL connect error!");	
+	}
 }
 
 void upload_file(char *filename)
@@ -45,20 +62,20 @@ void upload_file(char *filename)
 	//打开文件
 	fd = open(filename,O_RDONLY);
 	//发送命令
-	write(sockfd,&cmd,1);
+	SSL_write(ssl,&cmd,1);
 	
 	//发送文件名
-	write(sockfd,(void *)&FileNameSize,4);
-	write(sockfd,filename, FileNameSize);
+	SSL_write(ssl,(void *)&FileNameSize,4);
+	SSL_write(ssl,filename, FileNameSize);
 	//发送文件长度
 	if((stat(filename,&fstat)) == -1)
 		return;
-	write(sockfd,(void *)&fstat.st_size,4);
+	SSL_write(ssl,(void *)&fstat.st_size,4);
 	
 	//发送文件数据
 	while((count = read(fd,(void *)buf,1024)) > 0)
 	{
-		write(sockfd,buf,count);	
+		SSL_write(ssl,buf,count);	
 	}
 	//关闭文件
 	close(fd);
@@ -73,11 +90,11 @@ void download_file(char *filename)
 	int filesize=0,count=0,totalrecv=0;
 	
 	//发送命令
-	write(sockfd,&cmd,1);
+	SSL_write(ssl,&cmd,1);
 	
 	//发送文件名
-	write(sockfd,(void *)&FileNameSize,4);
-	write(sockfd,filename,FileNameSize);
+	SSL_write(ssl,(void *)&FileNameSize,4);
+	SSL_write(ssl,filename,FileNameSize);
 	
 	//打开并创建文件
 	if((fd = open(filename,O_RDWR|O_CREAT)) == -1)
@@ -87,8 +104,8 @@ void download_file(char *filename)
 	}
 	
 	//接收数据
-	read(sockfd,&filesize,4);
-	while((count = read(sockfd,(void *)buf,1024)) > 0)
+	SSL_read(ssl,&filesize,4);
+	while((count = SSL_read(ssl,(void *)buf,1024)) > 0)
 	{
 		write(fd,buf,count);
 		totalrecv += count;
@@ -104,7 +121,10 @@ void quit()
 {
 	char cmd = 'Q';
 	//发送命令
-	write(sockfd,(void *)&cmd,1);
+	SSL_write(ssl,(void *)&cmd,1);
+	//关闭及释放SSL连接
+	SSL_shutdown(ssl);
+	SSL_free(ssl);
 	//清屏
 	system("clear");
 	//退出
@@ -171,11 +191,24 @@ int main(int argc, char *args[])
 	    	_exit(0);	
 	}
 	strcpy(ipaddr,args[1]);
+	
+	//初始化SSl
+	SSL_library_init();
+	OpenSSL_add_all_algorithms();
+	SSL_load_error_strings();
+	ctx = SSL_CTX_new(SSLv23_client_method());//创建SSL套接字，参数表明支持版本和客户机
+	if(ctx == NULL)
+	{
+		printf("Creat CTX error!!!");	
+	}
+	
 	//建立连接
 	linkS();
 	//打印菜单
 	menu();
 	//结尾操作
 	close(sockfd);
+	//释放CTX
+	SSL_CTX_free(ctx);
 	return 0;	
 }
