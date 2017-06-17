@@ -20,12 +20,40 @@ struct sockaddr_in sockaddr;
 SSL_CTX *ctx;
 SSL *ssl;
 
-void linkS()
+int login()
+{
+	char username[20];
+	char password[20];
+	int login_or_create;
+	char temp[100];
+	char buf[10];
+	int  login_flag=0;
+
+	printf("please input your selection: 1 to login 2 to create\n");
+	scanf("%d",login_or_create);
+	if(login_or_create != 1 || login_or_create != 2)
+	{
+		return 0;
+	}
+	printf("username:");
+	scanf("%s",username);
+	printf("password:");
+	scanf("%s",password);
+
+	sprintf(temp,"log:%dusername:%spassword:%s",login_or_create,username,password);
+
+	SSL_write(ssl,temp,100);
+	SSL_read(ssl,buf,10);
+	sscanf(buf,"login:%d",&login_flag);
+	//0失败1成功
+	return login_flag;
+}
+int linkS()
 {
 	//创建socket
 	if((sockfd = socket(AF_INET,SOCK_STREAM,0)) == -1)
 	{
-		perror("socket");
+		perror("socket\n");
 		_exit(0);
 	}
 	//连接
@@ -35,7 +63,7 @@ void linkS()
 	sockaddr.sin_addr.s_addr = inet_addr(ipaddr);
 	if(connect(sockfd,(struct sockaddr *)&sockaddr,sizeof(sockaddr)) == -1)
 	{
-		perror("connect");
+		perror("connect\n");
 		_exit(0);
 	}
 	
@@ -43,12 +71,14 @@ void linkS()
 	SSL_set_fd(ssl,sockfd);
 	if(SSL_connect(ssl) == -1)
 	{
-		printf("SSL connect successful!");	
+		printf("SSL connect successful!\n");	
 	}
 	else
 	{
-		printf("SSL connect error!");	
+		printf("SSL connect error!\n");	
 	}
+
+	return login();
 }
 
 void upload_file(char *filename)
@@ -205,7 +235,17 @@ int main(int argc, char *args[])
 	}
 	
 	//建立连接
-	linkS();
+	if(linkS() == 0)
+	{
+		printf("user name or password error!\n");
+		//关闭及释放SSL连接
+		SSL_shutdown(ssl);
+		SSL_free(ssl);
+		//清屏
+		system("clear");
+		_exit(0);
+	}
+	printf("----------login successufl!------------\n");
 	//打印菜单
 	menu();
 	//结尾操作

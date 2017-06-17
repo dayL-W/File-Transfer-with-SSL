@@ -10,6 +10,7 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 #include <pthread.h> 
+#include <sqlite3.h> 
 
 #define port 3333
 
@@ -51,8 +52,10 @@ int sockfd;
 struct sockaddr_in sockaddr;
 struct sockaddr_in client_addr;
 int sin_size;
-SSL_CTX *ctx;
+char passwd_d[20];
 
+SSL_CTX *ctx;
+sqlite3 *db; 
 
 void pool_init (int max_thread_num) 
 { 
@@ -217,6 +220,69 @@ void handle(char cmd,SSL *ssl)
 	}
 }
 
+static int callback(void *NotUsed, int argc, char **argv, char **azColName) 
+{ 
+     int i; 
+     for(i=0; i<argc; i++) 
+     {          
+     	strcpy(passwd_d,argv[i]);
+     } 
+    return 0;
+} 
+
+int login(SSL *ssl)
+{
+	char username[20];
+	char password[20];
+	int login_or_create;
+	char temp[100];
+	char buf[10];
+	int  login_flag=0;
+	char sql[100];
+	int rc;
+
+	SSL_read(ssl,temp,100);
+	sscanf(temp,"log:%dusername:%spassword:%s",login_or_create,username,password);
+	//注册
+	if(login_or_create == 2)
+	{
+		sprintf(sql,"insert into stu(username,password) values(%s,%s);",username,password);
+		rc = sqlite3_exec(db, sql, callback, 0, NULL);
+		if(rc == SQLITE_OK)
+		{
+			sqlite3_close(db); 
+			sprintf(buf,"login:%d",1);
+			SSL_write(ssl,buf,10);
+			return 1;
+		} 
+		else
+		{
+			sprintf(buf,"login:%d",0);
+			SSL_write(ssl,buf,10);
+			return 0;
+		}
+	}
+	//登录
+	else
+	{
+		sprintf(sql, "select password from stu where username='%s';",username); 
+		sqlite3_exec(db, sql, callback, 0, NULL);
+		if(strcmp(password,passwd_d) == 0)
+		{
+			sqlite3_close(db); 
+			sprintf(buf,"login:%d",1);
+			SSL_write(ssl,buf,10);
+			return 1;
+		}
+		else
+		{
+			sprintf(buf,"login:%d",0);
+			SSL_write(ssl,buf,10);
+			return 0;
+		}
+	}
+
+}
 void *myprocess(int args)
 {
 	SSL *ssl;
@@ -230,6 +296,14 @@ void *myprocess(int args)
 	//处理事件
 	while(1)
 	{
+		if(login(ssl) == 0)
+		{
+			SSL_shutdown(ssl);
+			SSL_free(ssl);
+			close(tmp_fd);
+			break;	
+		}
+
 		SSL_read(ssl,&cmd,1);
 		
 		if(cmd == 'Q')
@@ -251,9 +325,15 @@ void *myprocess(int args)
 int main()
 {
 	int newfd;
+	char sql[100];
+
 	//初始化线程池
 	pool_init(5);
 
+	//创建数据库
+	sqlite3_open("user.db",&db);
+	sprintf(sql,"create table stu(username varchar(10), password varhar(10));");
+	sqlite3_exec(db, sql, callback, 0, NULL); 
 	//建立连接
 	
 	//SSL连接
