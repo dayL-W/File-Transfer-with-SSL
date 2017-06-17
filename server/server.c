@@ -242,7 +242,7 @@ int login(SSL *ssl)
 	int rc;
 
 	SSL_read(ssl,temp,100);
-	sscanf(temp,"log:%dusername:%spassword:%s",login_or_create,username,password);
+	sscanf(temp,"log:%dusername:%spassword:%s",&login_or_create,username,password);
 	//注册
 	if(login_or_create == 2)
 	{
@@ -257,6 +257,7 @@ int login(SSL *ssl)
 		} 
 		else
 		{
+			printf("insert to database error!\n");
 			sprintf(buf,"login:%d",0);
 			SSL_write(ssl,buf,10);
 			return 0;
@@ -326,14 +327,20 @@ int main()
 {
 	int newfd;
 	char sql[100];
-
+	int rc;
 	//初始化线程池
 	pool_init(5);
 
 	//创建数据库
 	sqlite3_open("user.db",&db);
-	sprintf(sql,"create table stu(username varchar(10), password varhar(10));");
-	sqlite3_exec(db, sql, callback, 0, NULL); 
+	sprintf(sql,"create table stu(username char(20), password char(20));");
+	rc = sqlite3_exec(db, sql, callback, 0, NULL); 
+	if(rc == SQLITE_OK)
+	{
+		printf("create tables ok\n");
+	}
+	else
+		printf("create tables error!\n");
 	//建立连接
 	
 	//SSL连接

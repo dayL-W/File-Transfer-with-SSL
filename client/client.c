@@ -28,10 +28,10 @@ int login()
 	char temp[100];
 	char buf[10];
 	int  login_flag=0;
-
+	
 	printf("please input your selection: 1 to login 2 to create\n");
-	scanf("%d",login_or_create);
-	if(login_or_create != 1 || login_or_create != 2)
+	scanf("%d",&login_or_create);
+	if(login_or_create != 1 && login_or_create != 2)
 	{
 		return 0;
 	}
@@ -71,11 +71,12 @@ int linkS()
 	SSL_set_fd(ssl,sockfd);
 	if(SSL_connect(ssl) == -1)
 	{
-		printf("SSL connect successful!\n");	
+		printf("SSL connect error!\n");	
+		_exit(0);
 	}
 	else
 	{
-		printf("SSL connect error!\n");	
+		printf("SSL connect successful!\n");	
 	}
 
 	return login();
