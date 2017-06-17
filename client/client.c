@@ -16,18 +16,19 @@
 char ipaddr[15];
 int sockfd;
 struct sockaddr_in sockaddr;
-SSL_CTX *ctx;//SSLÌ×½Ó×Ö
+//å£°æ˜SSLå¥—æ¥å­—
+SSL_CTX *ctx;
 SSL *ssl;
 
 void linkS()
 {
-	//´´½¨socket
+	//åˆ›å»ºsocket
 	if((sockfd = socket(AF_INET,SOCK_STREAM,0)) == -1)
 	{
 		perror("socket");
 		_exit(0);
 	}
-	//Á¬½Ó
+	//è¿æ¥
 	memset(&sockaddr,0, sizeof(sockaddr));
 	sockaddr.sin_family = AF_INET;
 	sockaddr.sin_port = htons(port);
@@ -59,25 +60,25 @@ void upload_file(char *filename)
 	int count=0;
 	struct stat fstat;
 	
-	//´ò¿ªÎÄ¼ş
+	//æ‰“å¼€æ–‡ä»¶
 	fd = open(filename,O_RDONLY);
-	//·¢ËÍÃüÁî
+	//å‘é€å‘½ä»¤
 	SSL_write(ssl,&cmd,1);
 	
-	//·¢ËÍÎÄ¼şÃû
+	//å‘é€æ–‡ä»¶å
 	SSL_write(ssl,(void *)&FileNameSize,4);
 	SSL_write(ssl,filename, FileNameSize);
-	//·¢ËÍÎÄ¼ş³¤¶È
+	//å‘é€æ–‡ä»¶é•¿åº¦
 	if((stat(filename,&fstat)) == -1)
 		return;
 	SSL_write(ssl,(void *)&fstat.st_size,4);
 	
-	//·¢ËÍÎÄ¼şÊı¾İ
+	//å‘é€æ–‡ä»¶æ•°æ®
 	while((count = read(fd,(void *)buf,1024)) > 0)
 	{
 		SSL_write(ssl,buf,count);	
 	}
-	//¹Ø±ÕÎÄ¼ş
+	//å…³é—­æ–‡ä»¶
 	close(fd);
 }
 
@@ -89,21 +90,21 @@ void download_file(char *filename)
 	int FileNameSize = strlen(filename);
 	int filesize=0,count=0,totalrecv=0;
 	
-	//·¢ËÍÃüÁî
+	//å‘é€å‘½ä»¤
 	SSL_write(ssl,&cmd,1);
 	
-	//·¢ËÍÎÄ¼şÃû
+	//å‘é€æ–‡ä»¶å
 	SSL_write(ssl,(void *)&FileNameSize,4);
 	SSL_write(ssl,filename,FileNameSize);
 	
-	//´ò¿ª²¢´´½¨ÎÄ¼ş
+	//æ‰“å¼€å¹¶åˆ›å»ºæ–‡ä»¶
 	if((fd = open(filename,O_RDWR|O_CREAT)) == -1)
 	{
 		perror("open:");
 		_exit(0);	
 	}
 	
-	//½ÓÊÕÊı¾İ
+	//æ¥æ”¶æ•°æ®
 	SSL_read(ssl,&filesize,4);
 	while((count = SSL_read(ssl,(void *)buf,1024)) > 0)
 	{
@@ -113,21 +114,21 @@ void download_file(char *filename)
 			break;	
 	}
 	
-	//¹Ø±ÕÎÄ¼ş
+	//å…³é—­æ–‡ä»¶
 	close(fd);
 }
 
 void quit()
 {
 	char cmd = 'Q';
-	//·¢ËÍÃüÁî
+	//å‘é€å‘½ä»¤
 	SSL_write(ssl,(void *)&cmd,1);
-	//¹Ø±Õ¼°ÊÍ·ÅSSLÁ¬½Ó
+	//å…³é—­åŠé‡Šæ”¾SSLè¿æ¥
 	SSL_shutdown(ssl);
 	SSL_free(ssl);
-	//ÇåÆÁ
+	//æ¸…å±
 	system("clear");
-	//ÍË³ö
+	//é€€å‡º
 	_exit(0);
 }
 void menu()
@@ -149,28 +150,28 @@ void menu()
 			case '1':
 			{
 				printf("Upload Files:");
-				//ÊäÈëÎÄ¼şÃû
+				//è¾“å…¥æ–‡ä»¶å
 				while((c = getchar()) != '\n' && c != EOF);
 				fgets(file_u, 30, stdin);
 				file_u[strlen(file_u)-1] = '\0';
-				//ÉÏ´«ÎÄ¼ş
+				//ä¸Šä¼ æ–‡ä»¶
 				upload_file(file_u);
 			}
 			break;	
 			case '2':
 			{
 				printf("Download Files:");
-				//ÊäÈëÎÄ¼şÃû
+				//è¾“å…¥æ–‡ä»¶å
 				while((c = getchar()) != '\n' && c != EOF);
 				fgets(file_d, 30, stdin);
 				file_d[strlen(file_d)-1] = '\0';
-				//ÏÂÔØÎÄ¼ş
+				//ä¸‹è½½æ–‡ä»¶
 				download_file(file_d);
 			}
 			break;	
 			case '3':
 			{
-				//ÍË³ö
+				//é€€å‡º
 				quit();
 				break;
 			}
@@ -192,23 +193,24 @@ int main(int argc, char *args[])
 	}
 	strcpy(ipaddr,args[1]);
 	
-	//³õÊ¼»¯SSl
+	//åˆå§‹åŒ–SSl
 	SSL_library_init();
 	OpenSSL_add_all_algorithms();
 	SSL_load_error_strings();
-	ctx = SSL_CTX_new(SSLv23_client_method());//´´½¨SSLÌ×½Ó×Ö£¬²ÎÊı±íÃ÷Ö§³Ö°æ±¾ºÍ¿Í»§»ú
+	//åˆ›å»ºSSLå¥—æ¥å­—ï¼Œå‚æ•°è¡¨æ˜æ”¯æŒç‰ˆæœ¬å’Œå®¢æˆ·æœº
+	ctx = SSL_CTX_new(SSLv23_client_method());
 	if(ctx == NULL)
 	{
 		printf("Creat CTX error!!!");	
 	}
 	
-	//½¨Á¢Á¬½Ó
+	//å»ºç«‹è¿æ¥
 	linkS();
-	//´òÓ¡²Ëµ¥
+	//æ‰“å°èœå•
 	menu();
-	//½áÎ²²Ù×÷
+	//ç»“å°¾æ“ä½œ
 	close(sockfd);
-	//ÊÍ·ÅCTX
+	//é‡Šæ”¾CTX
 	SSL_CTX_free(ctx);
 	return 0;	
 }

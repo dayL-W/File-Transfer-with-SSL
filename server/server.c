@@ -32,20 +32,20 @@ void handle(char cmd)
 	{
 		case 'U':
 		{
-			//½ÓÊÕÎÄ¼şÃû
+			//æ¥æ”¶æ–‡ä»¶å
 			SSL_read(ssl, &FileNameSize, 4);
 			SSL_read(ssl, (void *)filename, FileNameSize);
 			filename[FileNameSize]='\0';
-			//´´½¨ÎÄ¼ş
+			//åˆ›å»ºæ–‡ä»¶
 			if((fd = open(filename,O_RDWR|O_CREAT)) == -1)
 			{
 				perror("creat:");
 				_exit(0);	
 			}
-			//½ÓÊÕÎÄ¼ş³¤¶È
+			//æ¥æ”¶æ–‡ä»¶é•¿åº¦
 			SSL_read(ssl, &filesize, 4);
 			
-			//½ÓÊÕÎÄ¼ş
+			//æ¥æ”¶æ–‡ä»¶
 			while((count = SSL_read(ssl,(void *)buf,1024)) > 0)
 			{
 				write(fd,&buf,count);
@@ -53,24 +53,24 @@ void handle(char cmd)
 				if(totalrecv == filesize)
 					break;	
 			}			
-			//¹Ø±ÕÎÄ¼ş
+			//å…³é—­æ–‡ä»¶
 			close(fd);
 		}
 		break;
 		
 		case 'D':
 		{
-			//½ÓÊÕÎÄ¼şÃû
+			//æ¥æ”¶æ–‡ä»¶å
 			SSL_read(ssl, &FileNameSize, 4);
 			SSL_read(ssl, filename, FileNameSize);
 			filename[FileNameSize]='\0';
-			//´ò¿ªÎÄ¼ş
+			//æ‰“å¼€æ–‡ä»¶
 			if((fd = open(filename,O_RDONLY)) == -1)
 			{
 				perror("creat:");
 				_exit(0);	
 			}
-			//·¢ËÍÎÄ¼ş°üÀ¨ÎÄ¼ş³¤¶È
+			//å‘é€æ–‡ä»¶é•¿åº¦å’Œæ–‡ä»¶å
 			if((stat(filename,&fstat)) == -1)
 				return;
 			SSL_write(ssl,&fstat.st_size,4);
@@ -89,19 +89,19 @@ int main()
 	char cmd;
 	
 	
-	//½¨Á¢Á¬½Ó
+	//å»ºç«‹è¿æ¥
 	
-	//SSLÁ¬½Ó
+	//SSLè¿æ¥
 	SSL_library_init();
 	OpenSSL_add_all_algorithms();
 	SSL_load_error_strings();
 	ctx = SSL_CTX_new(SSLv23_server_method());
-	//ÔØÈëÊı×ÖÖ¤Êé
+	//è½½å…¥æ•°å­—è¯ä¹¦
 	SSL_CTX_use_certificate_file(ctx,"./cacert.pem",SSL_FILETYPE_PEM);
-	//ÔØÈë²¢¼ì²éË½Ô¿
+	//è½½å…¥ç§é’¥
 	SSL_CTX_use_PrivateKey_file(ctx,"./privkey.pem",SSL_FILETYPE_PEM);
 	SSL_CTX_check_private_key(ctx);
-	//´´½¨socket
+	//åˆ›å»ºsocket
 	if((sockfd = socket(AF_INET,SOCK_STREAM,0)) == -1)
 	{
 		perror("socket:");
@@ -113,13 +113,13 @@ int main()
 	sockaddr.sin_port = htons(port);
 	sockaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	
-	//°ó¶¨µØÖ·
+	//ç»‘å®šåœ°å€
 	if(bind(sockfd,(struct sockaddr *)&sockaddr,sizeof(sockaddr)) == -1)
 	{
 		perror("bind:");
 		_exit(0);	
 	}
-	//¼àÌı
+	//ç›‘å¬
 	if(listen(sockfd,10) == -1)
 	{
 		perror("listen");	
@@ -127,16 +127,17 @@ int main()
 	
 	while(1)
 	{
-		//Á¬½Ó
+		//è¿æ¥
 		if((newfd = accept(sockfd, (struct sockaddr *)(&client_addr),&sin_size)) == -1)
 		{
 			perror("accept:");	
 			_exit(0);
 		}
-		ssl = SSL_new(ctx);//²úÉúĞÂµÄSSL
+		//äº§ç”Ÿæ–°çš„SSL
+		ssl = SSL_new(ctx);
 		SSL_set_fd(ssl,newfd);
 		SSL_accept(ssl);
-		//´¦ÀíÊÂ¼ş
+		//å¤„ç†äº‹ä»¶
 		while(1)
 		{
 			SSL_read(ssl,&cmd,1);
