@@ -47,7 +47,7 @@ static Cthread_pool *pool = NULL;
 void *thread_routine (void *arg); 
 
 
-int sockfd;
+int sockfd,newfd;
 struct sockaddr_in sockaddr;
 struct sockaddr_in client_addr;
 int sin_size;
@@ -236,8 +236,7 @@ void *myprocess(int args)
 		{
 			SSL_shutdown(ssl);
 			SSL_free(ssl);
-			close(tmp_fd);
-			break;	
+			close(newfd);	
 		}
 		else
 		{
@@ -250,7 +249,7 @@ void *myprocess(int args)
 
 int main()
 {
-	int newfd;
+	
 	//初始化线程池
 	pool_init(5);
 
