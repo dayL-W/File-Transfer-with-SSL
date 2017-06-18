@@ -241,26 +241,23 @@ int login(SSL *ssl)
 	char sql[100];
 	int rc;
 
+	sqlite3_open("user.db",&db);
 	SSL_read(ssl,temp,100);
-	sscanf(temp,"log:%dusername:%spassword:%s",&login_or_create,username,password);
+	sscanf(temp,"log:%d username:%s password:%s",&login_or_create,username,password);
 	//注册
 	if(login_or_create == 2)
 	{
-		sprintf(sql,"insert into stu(username,password) values(%s,%s);",username,password);
+		sprintf(sql,"insert into stu(username,password) values('%s','%s');",username,password);
+		printf("username:%s password:%s\n",username,password);
 		rc = sqlite3_exec(db, sql, callback, 0, NULL);
 		if(rc == SQLITE_OK)
-		{
-			sqlite3_close(db); 
-			sprintf(buf,"login:%d",1);
-			SSL_write(ssl,buf,10);
-			return 1;
+		{ 
+			login_flag = 1;
 		} 
 		else
 		{
+			login_flag = 0;
 			printf("insert to database error!\n");
-			sprintf(buf,"login:%d",0);
-			SSL_write(ssl,buf,10);
-			return 0;
 		}
 	}
 	//登录
@@ -268,20 +265,22 @@ int login(SSL *ssl)
 	{
 		sprintf(sql, "select password from stu where username='%s';",username); 
 		sqlite3_exec(db, sql, callback, 0, NULL);
+		printf("username:%s password:%s\n",username,passwd_d);
 		if(strcmp(password,passwd_d) == 0)
 		{
-			sqlite3_close(db); 
-			sprintf(buf,"login:%d",1);
-			SSL_write(ssl,buf,10);
-			return 1;
+			login_flag = 1;
 		}
 		else
 		{
-			sprintf(buf,"login:%d",0);
-			SSL_write(ssl,buf,10);
+			login_flag = 0;
 			return 0;
 		}
 	}
+	sqlite3_close(db);
+	sprintf(buf,"login:%d",login_flag);
+	SSL_write(ssl,buf,10);
+	
+	return login_flag;
 
 }
 void *myprocess(int args)
@@ -332,15 +331,18 @@ int main()
 	pool_init(5);
 
 	//创建数据库
-	sqlite3_open("user.db",&db);
+	rc = sqlite3_open("user.db",&db);
+	if(rc)
+	{
+		printf("Can't open database: %s\n", sqlite3_errmsg(db)); 
+        sqlite3_close(db); 
+	}
 	sprintf(sql,"create table stu(username char(20), password char(20));");
 	rc = sqlite3_exec(db, sql, callback, 0, NULL); 
-	if(rc == SQLITE_OK)
+	if(rc != SQLITE_OK)
 	{
-		printf("create tables ok\n");
-	}
-	else
 		printf("create tables error!\n");
+	}
 	//建立连接
 	
 	//SSL连接

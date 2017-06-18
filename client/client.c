@@ -1,9 +1,10 @@
 #include<stdio.h>
 #include<string.h>
+#include<conio.h>
 #include<sys/socket.h>
 #include<sys/types.h>
 #include<netinet/in.h>
-#include <sys/stat.h>
+#include<sys/stat.h>
 #include<errno.h>
 #include<fcntl.h>
 #include<unistd.h>
@@ -24,12 +25,15 @@ int login()
 {
 	char username[20];
 	char password[20];
+	char ch;
+	int  cnt_ch=0;
 	int login_or_create;
 	char temp[100];
 	char buf[10];
 	int  login_flag=0;
 	
 	printf("please input your selection: 1 to login 2 to create\n");
+	printf("selection:");
 	scanf("%d",&login_or_create);
 	if(login_or_create != 1 && login_or_create != 2)
 	{
@@ -38,13 +42,32 @@ int login()
 	printf("username:");
 	scanf("%s",username);
 	printf("password:");
-	scanf("%s",password);
-
-	sprintf(temp,"log:%dusername:%spassword:%s",login_or_create,username,password);
+	while((ch = getch()) != '\n')
+	{
+		password[cnt_ch] = ch;
+		putchar('*');
+		cnt_ch++;
+	}
+	password[cnt_ch] = '\0';
+	getchar();
+	sprintf(temp,"log:%d username:%s password:%s",login_or_create,username,password);
 
 	SSL_write(ssl,temp,100);
 	SSL_read(ssl,buf,10);
 	sscanf(buf,"login:%d",&login_flag);
+
+	if(login_flag == 0)
+	{
+		printf("-----wrong username or password!-------\n");
+	}
+	else if(login_or_create == 1)
+	{
+		printf("----------login successufl!------------\n");
+	}
+	else
+	{
+		printf("----------create successufl!------------\n");
+	}
 	//0失败1成功
 	return login_flag;
 }
@@ -73,10 +96,6 @@ int linkS()
 	{
 		printf("SSL connect error!\n");	
 		_exit(0);
-	}
-	else
-	{
-		printf("SSL connect successful!\n");	
 	}
 
 	return login();
@@ -157,8 +176,6 @@ void quit()
 	//关闭及释放SSL连接
 	SSL_shutdown(ssl);
 	SSL_free(ssl);
-	//清屏
-	system("clear");
 	//退出
 	_exit(0);
 }
@@ -170,11 +187,11 @@ void menu()
 	char file_d[30];
 	while(1)
 	{
-		printf("\n------------------------------  1.Upload Files  ------------------------------\n");
-		printf("------------------------------  2.Download Files  ------------------------------\n");
-		printf("------------------------------      3.Exit   ------------------------------------\n");
+		printf("----------1.Upload Files---------------\n");
+		printf("----------2.Download Files-------------\n");
+		printf("----------3.Exit-----------------------\n");
 		printf("Please input the Client command:");
-		cmd = getchar();	
+		scanf("%c",&cmd);	
 		
 		switch(cmd)
 		{
@@ -209,7 +226,7 @@ void menu()
 			break;	
 			default:
 			{
-				printf("Please input right command!");	
+				printf("Please input right command!\n");	
 			}
 			break;	
 		}
@@ -246,7 +263,6 @@ int main(int argc, char *args[])
 		system("clear");
 		_exit(0);
 	}
-	printf("----------login successufl!------------\n");
 	//打印菜单
 	menu();
 	//结尾操作
