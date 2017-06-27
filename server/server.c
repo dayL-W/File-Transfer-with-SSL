@@ -233,7 +233,7 @@ static int callback(void *NotUsed, int argc, char **argv, char **azColName)
 int login(SSL *ssl)
 {
 	char username[20];
-	char password[20];
+	char password[33];
 	int login_or_create;
 	char temp[100];
 	char buf[10];
@@ -337,7 +337,7 @@ int main()
 		printf("Can't open database: %s\n", sqlite3_errmsg(db)); 
         sqlite3_close(db); 
 	}
-	sprintf(sql,"create table stu(username char(20), password char(20));");
+	sprintf(sql,"create table stu(username char(20), password char(40));");
 	rc = sqlite3_exec(db, sql, callback, 0, NULL); 
 	if(rc != SQLITE_OK)
 	{

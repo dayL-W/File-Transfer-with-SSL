@@ -1,16 +1,17 @@
-#include<stdio.h>
-#include<string.h>
-#include<conio.h>
-#include<sys/socket.h>
-#include<sys/types.h>
-#include<netinet/in.h>
-#include<sys/stat.h>
-#include<errno.h>
-#include<fcntl.h>
-#include<unistd.h>
+#include <stdio.h>
+#include <string.h>
+#include <curses.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <sys/stat.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#include <openssl/md5.h>
 
 #define port 3333
 
@@ -24,14 +25,17 @@ SSL *ssl;
 int login()
 {
 	char username[20];
-	char password[20];
+	char *password;
 	char ch;
 	int  cnt_ch=0;
 	int login_or_create;
 	char temp[100];
 	char buf[10];
-	int  login_flag=0;
-	
+	int  i=0,login_flag=0;
+	unsigned char md[15];
+	char password_md5[33]={'\0'};
+	char md5_tmp[33]={'\0'};
+
 	printf("please input your selection: 1 to login 2 to create\n");
 	printf("selection:");
 	scanf("%d",&login_or_create);
@@ -41,16 +45,17 @@ int login()
 	}
 	printf("username:");
 	scanf("%s",username);
-	printf("password:");
-	while((ch = getch()) != '\n')
+	password = getpass("password:");
+	MD5(password,strlen(password),md);
+	for(i=0; i<16; i++)
 	{
-		password[cnt_ch] = ch;
-		putchar('*');
-		cnt_ch++;
+		sprintf(md5_tmp,"%2.2x",md[i]);
+		strcat(password_md5,md5_tmp);
 	}
-	password[cnt_ch] = '\0';
-	getchar();
-	sprintf(temp,"log:%d username:%s password:%s",login_or_create,username,password);
+	password_md5[33] = '\0';
+	printf("password:%s\n",password);
+	printf("md5:%s\n",password_md5);
+	sprintf(temp,"log:%d username:%s password:%s",login_or_create,username,password_md5);
 
 	SSL_write(ssl,temp,100);
 	SSL_read(ssl,buf,10);
