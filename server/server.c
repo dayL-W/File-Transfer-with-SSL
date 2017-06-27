@@ -1,11 +1,12 @@
-#include<stdio.h>
-#include<string.h>
-#include<sys/socket.h>
-#include<sys/types.h>
-#include<netinet/in.h>
-#include<errno.h>
-#include<fcntl.h>
-#include<unistd.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <dirent.h>
 
 #include <openssl/err.h>
 #include <openssl/ssl.h>
@@ -16,8 +17,9 @@
 
 typedef struct task 
 { 
-    void *(*process) (int arg); 
-    int arg;
+    void *(*process) (int newfd, char *now_username); 
+    int newfd;
+    char *now_username;
     struct task *next; 
 } Cthread_task; 
 
@@ -52,10 +54,11 @@ int sockfd;
 struct sockaddr_in sockaddr;
 struct sockaddr_in client_addr;
 int sin_size;
-char passwd_d[20];
+char passwd_d[33];
 
 SSL_CTX *ctx;
 sqlite3 *db; 
+char now_username[20]; //存放当前线程执行任务的用户名
 
 void pool_init (int max_thread_num) 
 { 
@@ -114,7 +117,7 @@ void * thread_routine (void *arg)
         pthread_mutex_unlock (&(pool->queue_lock)); 
 
         /*调用回调函数，执行任务*/ 
-        (*(task->process)) (task->arg); 
+        (*(task->process)) (task->newfd,task->now_username); 
         free (task); 
         task = NULL; 
     } 
@@ -123,12 +126,13 @@ void * thread_routine (void *arg)
 }
 
 /*向线程池中加入任务*/ 
-int pool_add_task (void *(*process) (int arg), int arg) 
+int pool_add_task (void *(*process) (int newfd, char *now_username), int newfd, char *now_username) 
 { 
     /*构造一个新任务*/ 
     Cthread_task *task = (Cthread_task *) malloc (sizeof (Cthread_task)); 
     task->process = process; 
-    task->arg = arg; 
+    task->newfd = newfd;
+    task->now_username = now_username; 
     task->next = NULL;
 
     pthread_mutex_lock (&(pool->queue_lock)); 
@@ -154,15 +158,21 @@ int pool_add_task (void *(*process) (int arg), int arg)
     return 0; 
 } 
 
-void handle(char cmd,SSL *ssl)
+void handle(char cmd,SSL *ssl,char *now_username)
 {
 	char filename[30]={0};
 	int FileNameSize=0;
 	int fd;
 	int filesize=0;
 	int count=0,totalrecv=0;
+	char pwd[100];
 	char buf[1024];
 	struct stat fstat;
+	int file_cnt=0;
+	DIR *dir;
+	struct dirent *ptr;
+  
+
 	switch(cmd)
 	{
 		case 'U':
@@ -171,8 +181,16 @@ void handle(char cmd,SSL *ssl)
 			SSL_read(ssl, &FileNameSize, 4);
 			SSL_read(ssl, (void *)filename, FileNameSize);
 			filename[FileNameSize]='\0';
+
+			//strcat(pwd,"./");
+			getcwd(pwd,sizeof(pwd));
+			strcat(pwd,"/");
+			strcat(pwd,now_username);
+			strcat(pwd,"/");
+			strcat(pwd,filename);
+			
 			//创建文件
-			if((fd = open(filename,O_RDWR|O_CREAT)) == -1)
+			if((fd = open(pwd,O_RDWR|O_CREAT)) == -1)
 			{
 				perror("creat:");
 				_exit(0);	
@@ -195,18 +213,41 @@ void handle(char cmd,SSL *ssl)
 		
 		case 'D':
 		{
+			//统计用户文件夹的个数
+			getcwd(pwd,sizeof(pwd));
+			strcat(pwd,"/");
+			strcat(pwd,now_username);
+			dir = opendir(pwd);
+			while( (ptr = readdir(dir))!=NULL)
+			{
+				file_cnt++;
+			}
+			//发送文件个数
+			SSL_write(ssl, &file_cnt, 4);
+			//逐个发送文件名
+			dir = opendir(pwd);
+			while( (ptr = readdir(dir))!=NULL)
+			{
+				SSL_write(ssl, ptr->d_name, 20);
+			}
+
 			//接收文件名
 			SSL_read(ssl, &FileNameSize, 4);
 			SSL_read(ssl, filename, FileNameSize);
 			filename[FileNameSize]='\0';
+
+			//strcat(pwd,"./");
+			strcat(pwd,"/");
+			strcat(pwd,filename);
+			
 			//打开文件
-			if((fd = open(filename,O_RDONLY)) == -1)
+			if((fd = open(pwd,O_RDONLY)) == -1)
 			{
-				perror("creat:");
+				perror("open:");
 				_exit(0);	
 			}
 			//发送文件长度和文件名
-			if((stat(filename,&fstat)) == -1)
+			if((stat(pwd,&fstat)) == -1)
 				return;
 			SSL_write(ssl,&fstat.st_size,4);
 			
@@ -217,6 +258,9 @@ void handle(char cmd,SSL *ssl)
 			close(fd);
 		}
 		break;	
+
+		default:
+		break;
 	}
 }
 
@@ -240,16 +284,21 @@ int login(SSL *ssl)
 	int  login_flag=0;
 	char sql[100];
 	int rc;
+	char pwd[100];
 
 	sqlite3_open("user.db",&db);
 	SSL_read(ssl,temp,100);
 	sscanf(temp,"log:%d username:%s password:%s",&login_or_create,username,password);
+	strcpy(now_username,username);
 	//注册
 	if(login_or_create == 2)
 	{
 		sprintf(sql,"insert into stu(username,password) values('%s','%s');",username,password);
 		printf("username:%s password:%s\n",username,password);
 		rc = sqlite3_exec(db, sql, callback, 0, NULL);
+		strcat(pwd,"./");
+		strcat(pwd,now_username);
+		mkdir(pwd,S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 		if(rc == SQLITE_OK)
 		{ 
 			login_flag = 1;
@@ -283,12 +332,12 @@ int login(SSL *ssl)
 	return login_flag;
 
 }
-void *myprocess(int args)
+void *myprocess(int newfd, char *now_username)
 {
 	SSL *ssl;
-	int tmp_fd = args;
+	int tmp_fd = newfd;
 	char cmd;
-
+	int first=1;
 	//产生新的SSL
 	ssl = SSL_new(ctx);
 	SSL_set_fd(ssl,tmp_fd);
@@ -296,14 +345,14 @@ void *myprocess(int args)
 	//处理事件
 	while(1)
 	{
-		if(login(ssl) == 0)
+		if(first == 1 && login(ssl) == 0 )
 		{
 			SSL_shutdown(ssl);
 			SSL_free(ssl);
 			close(tmp_fd);
 			break;	
 		}
-
+		first = 0;
 		SSL_read(ssl,&cmd,1);
 		
 		if(cmd == 'Q')
@@ -315,7 +364,7 @@ void *myprocess(int args)
 		}
 		else
 		{
-			handle(cmd,ssl);	
+			handle(cmd,ssl,now_username);	
 		}
 	}
 	return NULL;
@@ -388,7 +437,7 @@ int main()
 			_exit(0);
 		}
 		//给线程池添加任务
-		pool_add_task(myprocess,newfd);
+		pool_add_task(myprocess,newfd,now_username);
 	}	
 	close(sockfd);
 	SSL_CTX_free(ctx);

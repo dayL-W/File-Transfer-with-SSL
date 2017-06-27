@@ -8,8 +8,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <stdlib.h>
-
 
 #include <openssl/err.h>
 #include <openssl/ssl.h>
@@ -139,43 +137,23 @@ void upload_file(char *filename)
 	close(fd);
 }
 
-void download_file()
+void download_file(char *filename)
 {
 	int fd;
 	char cmd = 'D';
 	char buf[1024];
-	int FileNameSize;
+	int FileNameSize = strlen(filename);
 	int filesize=0,count=0,totalrecv=0;
-	int file_num=0;
-	char file_name_temp[20];
-	char file_d[20];
-	char c;
-
+	
 	//发送命令
 	SSL_write(ssl,&cmd,1);
 	
-	//接收文件总个数和文件名
-	SSL_read(ssl,&file_num,4);
-	printf("Total file:%d\n",file_num);
-	while(file_num--)
-	{
-		SSL_read(ssl,file_name_temp,20);
-		printf("%s\n",file_name_temp);		
-	}
-	printf("Download Files:");
-	//输入文件名
-	while((c = getchar()) != '\n' && c != EOF);
-	fgets(file_d, 30, stdin);
-	file_d[strlen(file_d)-1] = '\0';
-
-
 	//发送文件名
-	FileNameSize = strlen(file_d);
 	SSL_write(ssl,(void *)&FileNameSize,4);
-	SSL_write(ssl,file_d,FileNameSize);
+	SSL_write(ssl,filename,FileNameSize);
 	
 	//打开并创建文件
-	if((fd = open(file_d,O_RDWR|O_CREAT)) == -1)
+	if((fd = open(filename,O_RDWR|O_CREAT)) == -1)
 	{
 		perror("open:");
 		_exit(0);	
@@ -235,8 +213,13 @@ void menu()
 			break;	
 			case '2':
 			{
+				printf("Download Files:");
+				//输入文件名
+				while((c = getchar()) != '\n' && c != EOF);
+				fgets(file_d, 30, stdin);
+				file_d[strlen(file_d)-1] = '\0';
 				//下载文件
-				download_file();
+				download_file(file_d);
 			}
 			break;	
 			case '3':
